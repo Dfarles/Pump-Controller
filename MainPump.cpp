@@ -10,18 +10,15 @@
  */
 
 #include <iostream>
-#include <chrono>
+
 
 using namespace std;
 
 void primaryPump();
 void secondaryPump(int);
-void cycle();
 bool pumpOn(int);
 bool pumpOff(int);
-bool checkTime();
 
-auto previousCycle = std::chrono::high_resolution_clock::now(); //Time stamp of last time water has been cycled
 double electricDemand = 0; // Instantaneous electric demand in KW
 const double ELECTHRESHOLD = 1200; // Value in KW. Below this value, a pump will turn on if tank isn't full
 double tankLevel = 17.047; // Level of tank in meters
@@ -66,12 +63,6 @@ void primaryPump(){
         pumpOn(PUMPORDER[0]);
         return;
     }
-
-    // If water hasn't cycled for 3 days, cycle it now
-    else if(checkTime()){
-        cycle();
-        return;
-    }
     // If electric demand is low, start filling the tank
     else if(electricDemand < ELECTHRESHOLD){
         pumpOn(PUMPORDER[0]);
@@ -104,66 +95,13 @@ void secondaryPump(int pumpIndex){
     }
 }
 
-void cycle(){
-    auto minutes = 0;
-    auto baseClock = std::chrono::high_resolution_clock::now();
-    double halfHour = 1800000.0;
-    while(minutes < halfHour){
-        
-    // If water level is too low, cycle is not necessary
-        if(tankLevel < TANKLOW){
-            return;
-        }
-
-    // If water level is too high, cycle is not necessary
-        else if(tankLevel > TANKHIGH){
-            return;
-        }
-
-    // Check if any of the pumps are on then check if it has been three days
-        else if((pumpStatus[0]+pumpStatus[1]+pumpStatus[2]+pumpStatus[3]) == 1){    
-            auto diff = std::chrono::high_resolution_clock::now() - baseClock;
-            auto minutes = std::chrono::duration<double, std::milli>(diff);
-        }
-        else if (minutes >= halfHour){ //If 30 minute timer expires, turn off main pump and exit cycle sequence
-            pumpOff(PUMPORDER[0]);
-            return;
-        }
-
-        else{ //If conditions are met, turn on main pump and start 30 minute timer
-            pumpOn(PUMPORDER[0]);
-            auto baseClock = chrono::high_resolution_clock::now();
-        }
-
-    } 
-}
-
 bool pumpOn(int pumpNumber){
     pumpStatus[pumpNumber] = 1;
-    
-    // Update last time water was cycled
-    previousCycle = std::chrono::high_resolution_clock::now();
     return pumpStatus[pumpNumber];
 }
 
 bool pumpOff(int pumpNumber){
     pumpStatus[pumpNumber] = 0;
-
-    // Update last time water was cycled
-    previousCycle = std::chrono::high_resolution_clock::now();
     pumpIndex--;
     return pumpStatus[pumpNumber];    
-}
-
-bool checkTime() //Check if water has been cycled in last three days
-{
-    auto diff = std::chrono::high_resolution_clock::now() - previousCycle; //Compute difference between current time stamp and last time a pump was turned on
-    auto hours = std::chrono::duration_cast<chrono::hours>(diff); //Change units to hours
-    
-    if(hours.count() > 72.0){ //If more than three days have passed, return a true. Otherwise, return false
-        return true;
-    }
-    else {
-        return false;
-    }
 }
